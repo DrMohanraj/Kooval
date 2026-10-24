@@ -7,20 +7,26 @@ const all = (await getCollection('interviews')).sort((a, b) => b.data.date.value
 const picks = [...all.filter((e) => e.data.featured), ...all.filter((e) => !e.data.featured)].slice(0, 5);
 const fmt = (d: Date) => d.toLocaleDateString('ta-IN', { year: 'numeric', month: 'long' });
 const THEME: Record<string, number> = { yellow: 1, blue: 2, black: 3 };
+
+function slugify(name: string) {
+  return (name || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0B80-\u0BFF-]/g, '');
+}
+
 const slides = picks.map((e) => ({
   slug: e.slug,
-  name: e.data.author,
+  name: e.data.authorName || e.data.author || 'எழுத்தாளர்',
   role: e.data.authorRole || '',
   date: fmt(e.data.date),
-  quote: e.data.pullQuotes[0] || '',
-  desc: e.data.excerpt,
-  spines: [e.data.category, ...e.data.tags.slice(0, 3), fmt(e.data.date)].slice(0, 5),
-  img: e.data.heroImage || e.data.photos[0] || '/images/portrait.webp',
+  quote: (e.data.pullQuotes && e.data.pullQuotes[0]) || '',
+  desc: e.data.excerpt || '',
+  spines: [e.data.category || 'இலக்கியம்', ...(e.data.tags || []).slice(0, 3), fmt(e.data.date)].slice(0, 5),
+  img: e.data.coverImage || e.data.heroImage || e.data.authorPhoto || (e.data.photos && e.data.photos[0]) || 'https://images.unsplash.com/photo-1516575334481-f85287c2c82d?w=1200&h=675&fit=crop&q=80',
   cut: Boolean(e.data.heroImage),
   theme: THEME[e.data.heroTheme] || 1,
 }));
 const s0 = slides[0];
 const json = JSON.stringify(slides).replace(/</g, '\\u003c');
+const recentInterviews = all.slice(0, 6);
 ---
 <BaseLayout>
   {s0 ? (
@@ -58,8 +64,68 @@ const json = JSON.stringify(slides).replace(/</g, '\\u003c');
       <div class="hl"><h2 class="t">இன்னும் நேர்காணல்கள் இல்லை</h2><p class="ds">/admin வழியாக முதல் நேர்காணலைச் சேர்க்கவும்.</p></div>
     </section>
   )}
+
+  <!-- Featured Editorial Section -->
+  <section class="px-margin-desktop py-section-gap">
+    <div class="max-w-6xl mx-auto">
+      <div class="flex flex-col md:flex-row md:items-end justify-between mb-stack-lg gap-4 reveal">
+        <div>
+          <span class="font-label-caps text-label-caps text-secondary font-bold tracking-widest block mb-2">CURATED VOICES</span>
+          <h2 class="font-display-lg text-3xl md:text-5xl text-primary font-bold">சமீபத்திய நேர்காணல்கள்</h2>
+        </div>
+        <a href="/archive" class="inline-flex items-center gap-2 font-label-caps text-sm text-primary font-semibold hover:text-secondary transition-colors group">
+          அனைத்து நேர்காணல்களும் (காப்பகம்)
+          <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {recentInterviews.map((entry) => {
+          const author = entry.data.authorName || entry.data.author || 'எழுத்தாளர்';
+          const cover = entry.data.coverImage || entry.data.heroImage || entry.data.authorPhoto || (entry.data.photos && entry.data.photos[0]) || 'https://images.unsplash.com/photo-1516575334481-f85287c2c82d?w=1200&h=675&fit=crop&q=80';
+          return (
+            <article class="reveal magazine-lift bg-white rounded-2xl overflow-hidden border border-neutral-200/80 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
+              <div>
+                <a href={`/interview/${entry.slug}`} class="block aspect-[16/10] overflow-hidden relative group">
+                  <span class="absolute top-3 left-3 z-10 bg-primary/90 text-white font-label-caps text-xs px-3 py-1 rounded-full shadow-sm">
+                    {entry.data.category || 'இலக்கியம்'}
+                  </span>
+                  <img src={cover} alt={author} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+                </a>
+
+                <div class="p-6">
+                  <div class="flex items-center gap-2 text-xs text-neutral-500 mb-2 font-caption">
+                    <span>{entry.data.date.toLocaleDateString('ta-IN', { year: 'numeric', month: 'long' })}</span>
+                    {entry.data.issueNumber && <span>• இதழ் {entry.data.issueNumber}</span>}
+                  </div>
+                  <a href={`/interview/${entry.slug}`} class="block group">
+                    <h3 class="font-headline-md text-xl font-bold text-neutral-900 group-hover:text-primary transition-colors leading-snug mb-3">
+                      {entry.data.title}
+                    </h3>
+                  </a>
+                  <p class="font-body-md text-sm text-neutral-600 line-clamp-3 mb-4 leading-relaxed">
+                    {entry.data.excerpt}
+                  </p>
+                </div>
+              </div>
+
+              <div class="px-6 pb-6 pt-2 border-t border-neutral-100 flex items-center justify-between">
+                <a href={`/author/${slugify(author)}`} class="flex items-center gap-2.5 group">
+                  {entry.data.authorPhoto && (
+                    <img src={entry.data.authorPhoto} alt={author} class="w-7 h-7 rounded-full object-cover border border-neutral-200" />
+                  )}
+                  <span class="text-xs font-semibold text-neutral-800 group-hover:text-primary transition-colors">{author}</span>
+                </a>
+                <a href={`/interview/${entry.slug}`} class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+                  வாசிக்க <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </a>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  </section>
+
   <QuoteWall />
 </BaseLayout>
-
-
-

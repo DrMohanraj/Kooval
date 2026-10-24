@@ -4,10 +4,15 @@ const interviews = defineCollection({
   type: 'content',
   schema: z.object({
     title: z.string(),
-    author: z.string(),
+    authorName: z.string().optional(),
+    author: z.string().optional(),
     authorRole: z.string().optional(),
+    authorPhoto: z.string().optional(),
+    coverImage: z.string().optional(),
+    interviewerName: z.string().optional(),
+    issueNumber: z.string().optional(),
     date: z.coerce.date(),
-    category: z.string(),
+    category: z.string().default('இலக்கியம்'),
     tags: z.array(z.string()).default([]),
     excerpt: z.string().default(''),
     featured: z.boolean().default(false),
@@ -20,6 +25,3 @@ const interviews = defineCollection({
 });
 
 export const collections = { interviews };
-
-
-

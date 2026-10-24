@@ -3,7 +3,7 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
 function slugify(name: string) {
-  return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0B80-\u0BFF-]/g, '');
+  return (name || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0B80-\u0BFF-]/g, '');
 }
 
 export async function getStaticPaths() {
@@ -15,49 +15,94 @@ export async function getStaticPaths() {
 }
 
 const { entry } = Astro.props;
-const { title, authorName, authorRole, authorPhoto, coverImage, interviewerName, category, tags, date, qa } = entry.data;
+const author = entry.data.authorName || entry.data.author || 'எழுத்தாளர்';
+const cover = entry.data.coverImage || entry.data.heroImage || entry.data.authorPhoto || (entry.data.photos && entry.data.photos[0]) || 'https://images.unsplash.com/photo-1516575334481-f85287c2c82d?w=1200&h=675&fit=crop&q=80';
+const photo = entry.data.authorPhoto || cover;
+const role = entry.data.authorRole || '';
+const title = entry.data.title;
+const interviewerName = entry.data.interviewerName || '';
+const category = entry.data.category || 'இலக்கியம்';
+const tags = entry.data.tags || [];
+const date = entry.data.date;
+const qa = entry.data.qa || [];
+const pullQuotes = entry.data.pullQuotes || [];
 ---
 <BaseLayout title={`${title} - கூவல்`}>
-  <article class="px-margin-desktop pt-section-gap">
-    <div class="max-w-3xl mx-auto text-center reveal active">
-      <span class="font-label-caps text-label-caps text-secondary">{category} • {date.toLocaleDateString('ta-IN', { year: 'numeric', month: 'long' })}</span>
-      <h1 class="font-display-lg text-display-lg text-primary my-6">{title}</h1>
-      {interviewerName && <p class="font-caption text-caption text-on-surface-variant">நேர்காணல் கண்டவர்: {interviewerName}</p>}
+  <article class="px-margin-desktop pt-12 md:pt-16 pb-20">
+    <div class="max-w-4xl mx-auto text-center reveal active">
+      <div class="inline-flex items-center gap-2 bg-primary/10 text-primary font-label-caps text-xs md:text-sm font-semibold px-4 py-1 rounded-full mb-4">
+        <span>{category}</span>
+        <span>•</span>
+        <span>{date.toLocaleDateString('ta-IN', { year: 'numeric', month: 'long' })}</span>
+      </div>
+      <h1 class="font-display-lg text-3xl md:text-5xl lg:text-6xl text-primary font-bold my-4 leading-tight">{title}</h1>
+      {interviewerName && (
+        <p class="font-caption text-sm text-neutral-500 mt-2">நேர்காணல் கண்டவர்: <span class="font-medium text-neutral-800">{interviewerName}</span></p>
+      )}
       {tags && tags.length > 0 && (
-        <div class="flex flex-wrap gap-2 justify-center mt-4">
+        <div class="flex flex-wrap gap-2 justify-center mt-5">
           {tags.map((tag) => (
-            <span class="font-caption text-[11px] bg-surface-variant text-on-surface-variant px-3 py-1 rounded-full">{tag}</span>
+            <span class="font-caption text-xs bg-neutral-100 text-neutral-700 px-3 py-1 rounded-full">{tag}</span>
           ))}
         </div>
       )}
     </div>
 
-    <div class="max-w-4xl mx-auto my-stack-lg rounded-xl overflow-hidden shadow-xl reveal active">
-      <img src={coverImage} alt={authorName} class="w-full aspect-[16/9] object-cover" />
+    <div class="max-w-4xl mx-auto my-10 rounded-2xl overflow-hidden shadow-xl reveal active border border-neutral-200">
+      <img src={cover} alt={author} class="w-full aspect-[16/9] object-cover" />
     </div>
 
-    <a href={`/author/${slugify(authorName)}`} class="max-w-2xl mx-auto flex items-center gap-4 mb-section-gap reveal active no-underline group">
+    <!-- Author Card -->
+    <a href={`/author/${slugify(author)}`} class="max-w-3xl mx-auto flex items-center gap-4 p-4 rounded-xl bg-white border border-neutral-200/80 shadow-sm hover:shadow-md transition-all mb-12 reveal active no-underline group">
       <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-primary/20 flex-shrink-0">
-        <img src={authorPhoto} alt={authorName} class="w-full h-full object-cover" />
+        <img src={photo} alt={author} class="w-full h-full object-cover" />
       </div>
       <div>
-        <h2 class="font-headline-md text-headline-md text-primary group-hover:underline">{authorName}</h2>
-        {authorRole && <p class="font-label-caps text-label-caps text-secondary">{authorRole}</p>}
+        <h2 class="font-headline-md text-xl font-bold text-neutral-900 group-hover:text-primary transition-colors">{author}</h2>
+        {role && <p class="font-label-caps text-xs text-neutral-500 uppercase tracking-wide mt-0.5">{role}</p>}
+      </div>
+      <div class="ml-auto text-primary text-xs font-semibold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+        <span>ஆளுமை பற்றி</span>
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
       </div>
     </a>
 
-    <div class="max-w-2xl mx-auto space-y-stack-lg pb-section-gap">
+    <!-- Pull Quote Box -->
+    {pullQuotes && pullQuotes.length > 0 && (
+      <div class="max-w-3xl mx-auto my-10 p-6 md:p-8 rounded-2xl bg-gradient-to-r from-blue-950 to-slate-900 text-amber-100 shadow-xl reveal active">
+        <span class="text-4xl text-amber-300 font-serif block leading-none mb-2">“</span>
+        <blockquote class="font-headline-md text-xl md:text-2xl font-bold leading-relaxed">
+          {pullQuotes[0]}
+        </blockquote>
+      </div>
+    )}
+
+    <!-- QA Dialogue Flow -->
+    <div class="max-w-3xl mx-auto space-y-8 pb-12">
       {qa.map((item, i) => (
-        <div class="reveal active">
-          <p class="font-headline-md text-headline-md text-primary mb-3">{item.question}</p>
-          <p class="font-body-lg text-body-lg text-on-surface leading-relaxed">{item.answer}</p>
-          {i < qa.length - 1 && <div class="h-[1px] bg-outline-variant/50 mt-stack-lg"></div>}
+        <div class="reveal active bg-white p-6 md:p-8 rounded-2xl border border-neutral-200/70 shadow-sm">
+          <div class="flex items-start gap-4">
+            <span class="w-8 h-8 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center flex-shrink-0 text-sm mt-0.5">
+              Q{i + 1}
+            </span>
+            <div class="flex-1">
+              <h3 class="font-headline-md text-lg md:text-xl font-bold text-neutral-900 mb-4 leading-snug">
+                {item.question}
+              </h3>
+              <p class="font-body-lg text-base md:text-lg text-neutral-700 leading-relaxed whitespace-pre-line">
+                {item.answer}
+              </p>
+            </div>
+          </div>
         </div>
       ))}
     </div>
 
-    <div class="max-w-2xl mx-auto pb-section-gap text-center reveal active">
-      <a href="/archive" class="font-label-caps text-label-caps text-primary border-b-2 border-primary pb-1 no-underline">← காப்பகத்திற்குத் திரும்பு</a>
+    <div class="max-w-3xl mx-auto pt-6 text-center reveal active">
+      <a href="/archive" class="inline-flex items-center gap-2 font-label-caps text-sm font-semibold text-primary hover:text-secondary transition-colors border-b-2 border-primary pb-1">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        காப்பகத்திற்குத் திரும்பு
+      </a>
     </div>
   </article>
 </BaseLayout>

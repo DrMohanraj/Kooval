@@ -2,14 +2,23 @@
 import '../styles/global.css';
 import { getCollection } from 'astro:content';
 
-const { title = 'கூவல் - இலக்கிய இதழ்', description = 'தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை - இலக்கிய - சூழலியல் ஆளுமைகளின் நேர்காணல் மூலம் உணர ஓர் முன்னெடுப்பு' } = Astro.props;
+const {
+  title = 'கூவல் - இலக்கிய இதழ்',
+  description = 'தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை - இலக்கிய - சூழலியல் ஆளுமைகளின் நேர்காணல் மூலம் உணர ஓர் முன்னெடுப்பு',
+} = Astro.props;
+
 const all = await getCollection('interviews');
 const counts: Record<string, number> = {};
-all.forEach((e) => e.data.tags.forEach((t) => { counts[t] = (counts[t] || 0) + 1; }));
-const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 12);
+all.forEach((e) => {
+  (e.data.tags || []).forEach((t) => {
+    counts[t] = (counts[t] || 0) + 1;
+  });
+});
+const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 14);
+const currentPath = Astro.url.pathname;
 ---
 <!doctype html>
-<html lang="ta">
+<html lang="ta" class="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
@@ -17,25 +26,92 @@ const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 
     <meta name="description" content={description} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Baloo+Thambi+2:wght@400;600;800&family=Meera+Inimai&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+Thambi+2:wght@400;600;700;800&family=Meera+Inimai&family=Noto+Serif+Tamil:wght@400;600;700&family=Manrope:wght@400;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <!-- Tailwind Engine with Koovel Design Tokens for Inner Pages -->
+    <script is:inline src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config" is:inline>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#1B4D91",
+              "primary-container": "#4F7FBF",
+              "on-primary": "#FFFFFF",
+              "on-primary-container": "#0F2A4A",
+              "secondary": "#4F7FBF",
+              "on-secondary": "#FFFFFF",
+              "secondary-container": "#E4EDF9",
+              "tertiary": "#4F7049",
+              "tertiary-container": "#82AB7D",
+              "on-tertiary": "#FFFFFF",
+              "background": "#FBF8F2",
+              "on-background": "#1A2938",
+              "surface": "#FBF8F2",
+              "on-surface": "#1A2938",
+              "surface-variant": "#E8DDC9",
+              "on-surface-variant": "#6A6B4E",
+              "surface-container": "#F4EEE2",
+              "surface-container-low": "#F8F4EC",
+              "surface-container-high": "#EFE7D9",
+              "surface-container-lowest": "#FFFFFF",
+              "outline": "#6A6B4E",
+              "outline-variant": "#DDD3BC"
+            },
+            spacing: {
+              "margin-desktop": "clamp(1.5rem, 5vw, 5rem)",
+              "margin-mobile": "1.25rem",
+              "gutter": "2rem",
+              "section-gap": "5rem",
+              "stack-lg": "2rem",
+              "stack-md": "1rem",
+              "stack-sm": "0.5rem"
+            },
+            fontFamily: {
+              "display-lg": ["'Baloo Thambi 2'", "'Noto Serif Tamil'", "serif"],
+              "headline-md": ["'Baloo Thambi 2'", "'Noto Serif Tamil'", "serif"],
+              "body-lg": ["'Meera Inimai'", "sans-serif"],
+              "body-md": ["'Meera Inimai'", "sans-serif"],
+              "caption": ["'Meera Inimai'", "'Manrope'", "sans-serif"],
+              "label-caps": ["'Manrope'", "'Baloo Thambi 2'", "sans-serif"]
+            }
+          }
+        }
+      };
+    </script>
   </head>
   <body>
     <header class="hd">
-      <a class="br" href="/"><span class="lg">கூவல்</span><small>சிந்தனைக்கும் இலக்கியத்துக்கும் ஒரு அமைதியான இடம்</small></a>
-      <nav>
-        <a class="on" href="/">முகப்பு</a>
+      <a class="br" href="/" aria-label="கூவல் முகப்பு">
+        <span class="lg">கூவல்</span>
+        <small>சிந்தனைக்கும் இலக்கியத்துக்கும் ஒரு அமைதியான இடம்</small>
+      </a>
+      <button class="mobile-toggle" id="menuToggle" aria-label="மெனுவை திறக்க">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <nav class="main-nav" id="mainNav">
+        <a class={currentPath === '/' ? 'on' : ''} href="/">முகப்பு</a>
+        <a class={currentPath.startsWith('/archive') ? 'on' : ''} href="/archive">காப்பகம்</a>
+        <a class={currentPath.startsWith('/issues') ? 'on' : ''} href="/issues">இதழ்கள்</a>
         <a href="/#wall">மேற்கோள்கள்</a>
-        <a href="/#join">சந்தா</a>
+        <a class={currentPath.startsWith('/about') ? 'on' : ''} href="/about">அறிமுகம்</a>
+        <a class={currentPath.startsWith('/contact') ? 'on' : ''} href="/contact">தொடர்பு</a>
       </nav>
       <a class="cta" href="/#join">சந்தா சேர் <svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </header>
 
-    <slot />
+    <main id="main-content">
+      <slot />
+    </main>
 
     <section class="jn" id="join">
-      <div><h2>உரையாடலில் <span>இணையுங்கள்</span></h2><p>மாதாந்திர கட்டுரைகள், தனிச்சிறப்பு நேர்காணல்கள் உங்கள் இன்பாக்ஸில்.</p></div>
+      <div>
+        <h2>உரையாடலில் <span>இணையுங்கள்</span></h2>
+        <p>மாதாந்திர கட்டுரைகள், தனிச்சிறப்பு நேர்காணல்கள் உங்கள் இன்பாக்ஸில் நேரடியாக வந்து சேரும்.</p>
+      </div>
       <div>
         <form id="nf" data-form="newsletter" data-ok="நன்றி! உங்கள் சந்தா பதிவு செய்யப்பட்டது.">
           <input type="email" name="email" required placeholder="உங்கள் மின்னஞ்சல் முகவரி" aria-label="மின்னஞ்சல்" />
@@ -46,14 +122,50 @@ const tags = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 
     </section>
 
     <footer>
-      <div class="lg">கூவல்</div>
-      <p>தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை - இலக்கிய - சூழலியல் ஆளுமைகளின் நேர்காணல் மூலம் உணர ஓர் முன்னெடுப்பு</p>
-      {tags.length > 0 && <div class="tg">{tags.map((t) => <span>{t}</span>)}</div>}
-      <small>© 2026 கூவல் இணைய இதழ்</small>
+      <div class="footer-top">
+        <div class="lg">கூவல்</div>
+        <p>தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை - இலக்கிய - சூழலியல் ஆளுமைகளின் நேர்காணல் மூலம் உணர ஓர் முன்னெடுப்பு</p>
+      </div>
+      <div class="footer-links">
+        <a href="/">முகப்பு</a>
+        <a href="/archive">நேர்காணல் காப்பகம்</a>
+        <a href="/issues">இதழ்கள்</a>
+        <a href="/about">எம்மைப் பற்றி</a>
+        <a href="/editor-note">ஆசிரியர் உரை</a>
+        <a href="/contact">தொடர்புக்கு</a>
+      </div>
+      {tags.length > 0 && (
+        <div class="tg">
+          {tags.map((t) => (
+            <a href={`/archive?tag=${encodeURIComponent(t)}`} class="tag-pill">{t}</a>
+          ))}
+        </div>
+      )}
+      <small>© 2026 கூவல் இணைய இதழ் • அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை</small>
     </footer>
+
+    <script is:inline>
+      // Mobile Navigation Drawer Toggle
+      const menuBtn = document.getElementById('menuToggle');
+      const nav = document.getElementById('mainNav');
+      if (menuBtn && nav) {
+        menuBtn.addEventListener('click', () => {
+          nav.classList.toggle('open');
+        });
+      }
+
+      // Smooth scroll reveal observer
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver((entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add('active');
+            }
+          });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.reveal').forEach((el) => obs.observe(el));
+      }
+    </script>
     <script is:inline src="/js/site.js"></script>
   </body>
 </html>
-
-
-
