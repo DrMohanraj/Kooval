@@ -2,12 +2,13 @@
 import { getCollection } from 'astro:content';
 import '../styles/global.css';
 
-const all = (await getCollection('interviews')).sort(
+const allInterviews = (await getCollection('interviews')).sort(
   (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
 );
-const featured = all.find((i) => i.data.featured) ?? all[0];
 
-// ----- Hero (CMS-இல் "Homepage Hero-ல் காட்டவா?" தேர்ந்த நேர்காணல்) -----
+const featured = allInterviews.find((i) => i.data.featured) ?? allInterviews[0];
+
+// Hero data
 const heroTitle = featured?.data.title ?? 'சொற்களின் மௌனம் பேசும் ஆழ்ந்த வெளி';
 const words = heroTitle.split(' ');
 const hlCount = words.length > 3 ? 2 : 1;
@@ -15,180 +16,613 @@ const titleMain = words.slice(0, words.length - hlCount).join(' ');
 const titleHl = words.slice(words.length - hlCount).join(' ');
 const heroLead = featured?.data.qa?.[0]?.answer ?? featured?.data.excerpt ?? '';
 const heroAuthor = featured?.data.authorName ?? 'எழுத்தாளர் பெயர்';
+const heroRole = featured?.data.authorRole ?? 'கவிஞர் & எழுத்தாளர்';
 const heroPhoto = featured?.data.coverImage || featured?.data.authorPhoto || '/images/hero-placeholder.jpg';
+const heroAvatar = featured?.data.authorPhoto || heroPhoto;
+const heroIssue = featured?.data.issueNumber ?? '12';
 
-// ----- மேற்கோள்கள்: எல்லா நேர்காணல்களின் pullQuotes -----
-const tints = ['blue', 'sage', 'gold', 'plum', 'olive'];
-const quotes = all.flatMap((i) =>
+// Quotes for Orbs & Wall
+const quotes = allInterviews.flatMap((i) =>
   (i.data.pullQuotes ?? []).filter(Boolean).map((q) => ({
     quote: q,
     author: i.data.authorName,
     role: i.data.authorRole ?? '',
-    photo: i.data.authorPhoto ?? '',
-    category: i.data.category,
-    featured: i.id === featured?.id,
+    photo: i.data.authorPhoto || i.data.coverImage || '/images/hero-placeholder.jpg',
+    category: i.data.category || 'இலக்கியம்',
+    slug: i.slug,
   }))
 );
+
 const heroQuotes = (featured?.data.pullQuotes ?? []).filter(Boolean).slice(0, 2);
 const orbQuotes = heroQuotes.length ? heroQuotes : quotes.slice(0, 2).map((q) => q.quote);
 
-const withTint = quotes.map((q, i) => ({ ...q, tint: tints[i % tints.length] }));
-const back = withTint.filter((_, i) => i % 2 === 0);
-const front = withTint.filter((_, i) => i % 2 === 1);
-// தடையற்ற சுழற்சிக்கு: குறைந்தது 6 card வரை நிரப்பி, பின் இரட்டிப்பாக்கு
-const fill = (arr) => {
-  if (!arr.length) return [];
-  let out = [...arr];
-  while (out.length < 6) out = out.concat(arr);
-  return out.concat(out);
-};
-const rowBack = fill(back);
-const rowFront = fill(front.length ? front : back.slice().reverse());
+const themes = ['blue', 'gold', 'sage', 'obsidian'];
+const quotesWithTheme = quotes.map((q, idx) => ({
+  ...q,
+  themeClass: `card-theme-${themes[idx % themes.length]}`,
+}));
 
-const petals = Array.from({ length: 10 }, (_, i) =>
-  `left:${3 + i * 9.5}%; animation-duration:${14 + (i % 4) * 3}s; animation-delay:-${(i * 2.2).toFixed(1)}s;`
-);
+const backRow = quotesWithTheme.filter((_, idx) => idx % 2 === 0);
+const frontRow = quotesWithTheme.filter((_, idx) => idx % 2 === 1);
+
+// Seamless infinite loop padding
+const makeLoop = (arr) => {
+  if (!arr.length) return [];
+  let res = [...arr];
+  while (res.length < 6) res = res.concat(arr);
+  return res.concat(res);
+};
+
+const loopRowBack = makeLoop(backRow);
+const loopRowFront = makeLoop(frontRow.length ? frontRow : backRow.slice().reverse());
+
+// Floating petals positions
+const petals = Array.from({ length: 12 }, (_, i) => ({
+  style: `left:${2 + i * 8.2}%; animation-duration:${12 + (i % 5) * 2.8}s; animation-delay:-${(i * 1.8).toFixed(1)}s;`,
+}));
+
+// All unique categories
+const categories = ['அனைத்தும்', ...new Set(allInterviews.map((i) => i.data.category || 'இலக்கியம்'))];
+
+// Pass all interviews serialized for in-place reading drawer
+const serializedData = JSON.stringify(
+  allInterviews.map((item) => ({
+    slug: item.slug,
+    title: item.data.title,
+    authorName: item.data.authorName,
+    authorRole: item.data.authorRole ?? '',
+    authorPhoto: item.data.authorPhoto || item.data.coverImage || '/images/hero-placeholder.jpg',
+    coverImage: item.data.coverImage || item.data.authorPhoto || '/images/hero-placeholder.jpg',
+    category: item.data.category || 'இலக்கியம்',
+    issueNumber: item.data.issueNumber ?? '12',
+    date: new Date(item.data.date).toLocaleDateString('ta-IN', { year: 'numeric', month: 'long' }),
+    excerpt: item.data.excerpt ?? '',
+    qa: item.data.qa ?? [],
+    pullQuotes: item.data.pullQuotes ?? [],
+  }))
+).replace(/</g, '\\u003c');
 ---
 <!DOCTYPE html>
 <html lang="ta">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>கூவல் - இலக்கிய மின்னிதழ்</title>
-<meta name="description" content="தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை, இலக்கியம், சூழலியல் ஆளுமைகளின் வழி உணரும் மாதாந்திர இலக்கிய மின்னிதழ்.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Tamil:wght@400;600;700;800&family=Catamaran:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&family=Bodoni+Moda:wght@500;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>கூவல் — கலை, இலக்கியம், சூழலியல் மின்னிதழ்</title>
+  <meta name="description" content="தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை, இலக்கியம், சூழலியல் ஆளுமைகளின் வழி உணரும் மாதாந்திர இலக்கிய மின்னிதழ்." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Tamil:wght@400;500;600;700;800;900&family=Catamaran:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Bodoni+Moda:ital,wght@0,500;0,700;1,400;1,700&display=swap" rel="stylesheet" />
 </head>
 <body>
 
+  <!-- ==========================================
+       1. TOPBAR NAVIGATION (Frosted Glass)
+  =========================================== -->
+  <header class="topbar">
+    <div class="brand-wrapper">
+      <a href="/" class="brand-logo" aria-label="கூவல் முகப்பு">
+        <span>கூவல்</span>
+      </a>
+      <span class="issue-pill">
+        <span class="pulse-dot"></span>
+        <span>இதழ் {heroIssue} • மார்ச் 2026</span>
+      </span>
+    </div>
 
-<!-- ======================================================
-  கூவல் (Koovel) — முகப்புப் பக்கம் மட்டும்
-  Placeholder: எழுத்தாளர் பெயர்கள், படங்கள், மேற்கோள்கள் எல்லாம் மாதிரி content.
-  மற்ற பக்கங்கள் நீக்கப்பட்டதால், மெனு/பொத்தான் இணைப்புகள் இப்போது "#"-ஐக் குறிக்கின்றன.
-====================================================== -->
+    <nav class="topnav">
+      <a href="#hero">முகப்பு</a>
+      <a href="#showcase">சிறப்புக் கட்டுரைகள்</a>
+      <a href="#quotes">மேற்கோள் அரங்கம்</a>
+      <a href="#footer">தொடர்புக்கு</a>
+      <a href="/admin/" class="btn-cms-link" title="Decap CMS Login">
+        <span>நிர்வாகம் (/admin)</span>
+      </a>
+    </nav>
+  </header>
 
-<header class="topbar">
-  <a href="#" class="logo">கூவல்</a>
-  <nav class="topnav label">
-    <a href="#quotes">மேற்கோள் அரங்கம்</a>
-    <a href="#footer">தொடர்புக்கு</a>
-  </nav>
-</header>
+  <!-- ==========================================
+       2. SPLIT HERO (Cobalt + Obsidian + Portrait)
+  =========================================== -->
+  <section class="sp-hero" id="hero">
+    
+    <!-- Left Half: Cobalt Blue -->
+    <div class="sp-left-box">
+      <div class="sp-left-content">
+        <div class="sp-kicker">
+          <span class="gold-bar"></span>
+          <span>சிறப்பு நேர்காணல் • இதழ் {heroIssue}</span>
+        </div>
 
-<section class="sp">
-  <div class="sp-left">
-    <div class="sp-left-in">
-      <span class="sp-label"><i class="bar"></i>நேர்காணல்</span>
-      <h1 class="sp-title">{titleMain} <span class="hl">{titleHl}</span></h1>
-      <p class="sp-lead" id="typer" data-full={heroLead}></p>
-      <div class="sp-cta">
-        <a href="#" class="sp-btn">தொடர்ந்து படிக்க <span class="material-symbols-outlined">arrow_outward</span></a>
-        <span class="sp-author">{heroAuthor}</span>
+        <h1 class="sp-title">
+          {titleMain} <span class="highlight">{titleHl}</span>
+        </h1>
+
+        <div class="sp-lead-box">
+          <span id="typer" data-full={heroLead}></span>
+          <span class="typewriter-cursor"></span>
+        </div>
+
+        <div class="sp-action-group">
+          <button class="btn-primary-gold" onclick={`openReader('${featured?.slug}')`} aria-label="நேர்காணல் வாசிக்க">
+            <span>முழுமையாக வாசிக்க</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+          </button>
+          
+          <div class="author-badge-kicker">
+            <span>{heroAuthor}</span>
+            <span style="opacity:0.5;">•</span>
+            <span style="opacity:0.8;">{heroRole}</span>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-  <a href="#" class="sp-portrait" aria-label="சிறப்பு நேர்காணல்">
-    <img src={heroPhoto} alt={heroAuthor} onerror="this.src='/images/hero-placeholder.jpg'" />
-  </a>
-  <div class="sp-right">
-    <div class="sp-orbs">
-      {orbQuotes.map((q, i) => (
-        <div class={`orb o${i + 1}`}><blockquote>"{q}"</blockquote></div>
+
+    <!-- Center Glowing Portrait -->
+    <div class="sp-center-portrait" onclick={`openReader('${featured?.slug}')`} title={`${heroAuthor} நேர்காணலைப் படிக்க கிளிக் செய்யவும்`}>
+      <img src={heroPhoto} alt={heroAuthor} onerror="this.src='/images/hero-placeholder.jpg'" />
+    </div>
+
+    <!-- Right Half: Obsidian Slate -->
+    <div class="sp-right-box">
+      <div class="sp-orbs-container">
+        {orbQuotes.map((q, i) => (
+          <div class={`orb-quote-card orb-${i + 1}`} onclick={`openReader('${featured?.slug}')`}>
+            <blockquote>“{q}”</blockquote>
+          </div>
+        ))}
+      </div>
+
+      <!-- Join Dialogue Callout -->
+      <div class="sp-dialogue-bar">
+        <div>
+          <h3>உரையாடலில் இணையுங்கள்</h3>
+          <p>மாதாந்திர கலை, இலக்கிய நேர்காணல்கள் உங்கள் இன்பாக்ஸில்.</p>
+        </div>
+        <a href="#newsletter" class="btn-join-pill">சேருங்கள்</a>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==========================================
+       3. EDITORIAL SHOWCASE (In This Issue)
+  =========================================== -->
+  <section class="showcase-section" id="showcase">
+    <div class="section-header">
+      <span class="section-label">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+        <span>Curated Voices • இந்த இதழின் சிறப்புகள்</span>
+      </span>
+      <h2 class="section-title">அறிவார்ந்த உரையாடல்கள் & நேர்காணல்கள்</h2>
+      <p class="section-subtitle">
+        தமிழ்ச் சமூகத்தின் கலை, இலக்கியம், மற்றும் சூழலியல் தளங்களில் தனித்துவமான தடம் பதித்த ஆளுமைகளின் ஆழமான சிந்தனைப் பகிர்வுகள்.
+      </p>
+
+      <!-- Category Filter Pills -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
+        {categories.map((cat, idx) => (
+          <button
+            class={`category-filter-btn ${idx === 0 ? 'active' : ''}`}
+            data-cat={cat}
+            onclick={`filterShowcase('${cat}')`}
+            style="background:#FFFFFF; border:1px solid rgba(23,25,30,0.12); padding:6px 16px; border-radius:999px; font-family:var(--font-label); font-size:12.5px; font-weight:700; cursor:pointer; transition:all 0.25s;"
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+    </div>
+
+    <!-- Articles Grid -->
+    <div class="showcase-grid" id="showcase-grid">
+      {allInterviews.map((entry) => {
+        const cover = entry.data.coverImage || entry.data.authorPhoto || '/images/hero-placeholder.jpg';
+        const photo = entry.data.authorPhoto || cover;
+        const author = entry.data.authorName;
+        const cat = entry.data.category || 'இலக்கியம்';
+
+        return (
+          <article class="article-card" data-category={cat} onclick={`openReader('${entry.slug}')`}>
+            <div>
+              <div class="card-media-wrap">
+                <span class="card-category-tag">{cat}</span>
+                <img src={cover} alt={author} loading="lazy" />
+              </div>
+              <div class="card-body">
+                <div class="card-meta">
+                  <span>{new Date(entry.data.date).toLocaleDateString('ta-IN', { year: 'numeric', month: 'long' })}</span>
+                  <span>•</span>
+                  <span>இதழ் {entry.data.issueNumber || '12'}</span>
+                </div>
+                <h3 class="card-title">{entry.data.title}</h3>
+                <p class="card-excerpt">{entry.data.excerpt || (entry.data.qa?.[0]?.answer ?? '')}</p>
+              </div>
+            </div>
+
+            <div class="card-footer">
+              <div class="author-chip">
+                <img src={photo} alt={author} class="author-avatar-img" />
+                <span class="author-name-text">{author}</span>
+              </div>
+              <span class="read-arrow-link">
+                <span>வாசிக்க</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </span>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  </section>
+
+  <!-- ==========================================
+       4. QUOTE WALL (சொற்களின் வெளி)
+  =========================================== -->
+  <section class="wall-section" id="quotes">
+    
+    <!-- Drifting Petals -->
+    <div class="petals-layer">
+      {petals.map((p) => (
+        <span class="petal-leaf" style={p.style}></span>
       ))}
     </div>
-    <div class="sp-join">
+
+    <div class="wall-header">
+      <span class="wall-badge">மேற்கோள் அரங்கம்</span>
+      <h2 class="wall-heading">சொற்களின் வெளி</h2>
+      <p class="wall-sub">தமிழ்ப் படைப்பாளிகளின் சிந்தனைத் துளிகள் — அட்டை மீது கிளிக் செய்து முழு நேர்காணலை வாசியுங்கள்</p>
+    </div>
+
+    <!-- Row 1: Leftward Infinite Marquee -->
+    <div class="marquee-row-wrapper">
+      <div class="marquee-track">
+        {loopRowBack.map((q) => (
+          <div class={`quote-paper-card ${q.themeClass}`} onclick={`openReader('${q.slug}')`}>
+            <div class="quote-top-row">
+              <span class="quote-cat">{q.category}</span>
+              <span class="quote-mark">“</span>
+            </div>
+            <p class="quote-text">{q.quote}</p>
+            <div class="quote-meta-line">
+              <div class="quote-author-wrap">
+                <div class="quote-avatar" style={`background-image:url('${q.photo}')`}></div>
+                <div>
+                  <div class="quote-author">{q.author}</div>
+                  {q.role && <div class="quote-role">{q.role}</div>}
+                </div>
+              </div>
+              <span style="font-family:var(--font-label); font-size:11.5px; font-weight:700; opacity:0.8;">வாசிக்க ↗</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- Row 2: Rightward Infinite Marquee -->
+    <div class="marquee-row-wrapper" style="margin-top:12px;">
+      <div class="marquee-track reverse">
+        {loopRowFront.map((q) => (
+          <div class={`quote-paper-card ${q.themeClass}`} onclick={`openReader('${q.slug}')`}>
+            <div class="quote-top-row">
+              <span class="quote-cat">{q.category}</span>
+              <span class="quote-mark">“</span>
+            </div>
+            <p class="quote-text">{q.quote}</p>
+            <div class="quote-meta-line">
+              <div class="quote-author-wrap">
+                <div class="quote-avatar" style={`background-image:url('${q.photo}')`}></div>
+                <div>
+                  <div class="quote-author">{q.author}</div>
+                  {q.role && <div class="quote-role">{q.role}</div>}
+                </div>
+              </div>
+              <span style="font-family:var(--font-label); font-size:11.5px; font-weight:700; opacity:0.8;">வாசிக்க ↗</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==========================================
+       5. NEWSLETTER CARD SECTION
+  =========================================== -->
+  <section class="showcase-section" id="newsletter" style="padding:60px clamp(20px,5vw,64px); background:#FAF8F5;">
+    <div style="max-w:800px; margin:0 auto; background:linear-gradient(135deg, #1A1D24, #121417); color:#FFFFFF; border-radius:24px; padding: clamp(32px, 5vw, 56px); border:1.5px solid var(--border-gold); box-shadow:0 20px 50px rgba(0,0,0,0.2); display:flex; flex-direction:column; align-items:center; text-align:center; position:relative; overflow:hidden;">
+      <div style="position:absolute; -right:80px; -bottom:80px; width:220px; height:220px; border-radius:50%; background:rgba(242,208,36,0.08); filter:blur(40px);"></div>
+      
+      <span style="background:rgba(242,208,36,0.15); border:1px solid var(--border-gold); color:var(--gold); font-family:var(--font-label); font-size:11px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; padding:4px 14px; border-radius:999px; margin-bottom:14px;">
+        NEWSLETTER & DISCOURSE
+      </span>
+      
+      <h2 style="font-family:var(--font-serif); font-size:clamp(24px, 3.5vw, 38px); font-weight:800; color:#FFFFFF; margin-bottom:12px;">
+        கூவல் மின்னிதழுடன் இணைந்திருங்கள்
+      </h2>
+      <p style="font-size:15px; color:rgba(255,255,255,0.75); max-width:540px; margin-bottom:28px;">
+        ஒவ்வொரு மாதமும் புதிய ஆளுமைகளின் ஆழமான நேர்காணல்கள், பிரத்யேகக் கட்டுரைகள், மற்றும் சிந்தனைப் பகிர்வுகள் உங்கள் மின்னஞ்சலில்.
+      </p>
+
+      <form id="subscribeForm" onsubmit="handleSubscribe(event)" style="display:flex; width:100%; max-width:480px; gap:8px; flex-wrap:wrap; justify-content:center;">
+        <input
+          type="email"
+          id="subEmail"
+          required
+          placeholder="உங்கள் மின்னஞ்சல் முகவரி..."
+          style="flex:1; min-width:240px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); border-radius:999px; padding:14px 22px; color:#FFFFFF; font-family:var(--font-body); font-size:14.5px; outline:none;"
+        />
+        <button type="submit" class="btn-primary-gold" style="padding:14px 28px;">
+          சந்தா சேர்
+        </button>
+      </form>
+      <div id="subMessage" style="margin-top:12px; font-size:13.5px; font-weight:700; color:var(--gold);"></div>
+    </div>
+  </section>
+
+  <!-- ==========================================
+       6. IN-PLACE INTERVIEW READING DRAWER
+  =========================================== -->
+  <div class="reading-drawer-backdrop" id="readerDrawer" onclick="closeReaderOnBackdrop(event)">
+    <div class="reading-drawer" id="drawerBody">
+      <div class="drawer-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span id="drawerCategoryPill" style="background:#0F5BC0; color:#FFF; font-family:var(--font-label); font-size:11px; font-weight:800; padding:4px 12px; border-radius:999px;">
+            இலக்கியம்
+          </span>
+          <span id="drawerIssueText" style="font-family:var(--font-label); font-size:12px; color:var(--ink-muted);">
+            இதழ் 12
+          </span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px;">
+          <!-- Font Size Controls -->
+          <div style="display:flex; gap:4px; background:#EAE7DE; border-radius:999px; padding:3px 8px; font-family:var(--font-label); font-size:12px; font-weight:700;">
+            <button onclick="changeFontSize(-1)" style="border:none; background:none; cursor:pointer; padding:2px 6px;">A-</button>
+            <span style="opacity:0.4;">|</span>
+            <button onclick="changeFontSize(1)" style="border:none; background:none; cursor:pointer; padding:2px 6px;">A+</button>
+          </div>
+
+          <button class="btn-close-drawer" onclick="closeReader()" aria-label="மூடுக">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="drawer-content-inner" id="drawerScrollArea">
+        <div class="drawer-hero-img-wrap">
+          <img id="drawerCoverImg" src="/images/hero-placeholder.jpg" alt="Cover" />
+        </div>
+
+        <!-- Author Banner -->
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--border-light);">
+          <img id="drawerAuthorAvatar" src="/images/hero-placeholder.jpg" style="width:56px; height:56px; border-radius:50%; object-fit:cover; border:2px solid var(--gold);" />
+          <div>
+            <h2 id="drawerAuthorName" style="font-family:var(--font-serif); font-size:22px; font-weight:800; color:var(--obsidian);">எழுத்தாளர் பெயர்</h2>
+            <p id="drawerAuthorRole" style="font-family:var(--font-label); font-size:13px; color:var(--ink-secondary);">கவிஞர்</p>
+          </div>
+        </div>
+
+        <h1 id="drawerTitle" style="font-family:var(--font-serif); font-size:clamp(26px, 3.5vw, 38px); font-weight:800; line-height:1.25; color:var(--obsidian); margin-bottom:24px;">
+          சொற்களின் மௌனம் பேசும் ஆழ்ந்த வெளி
+        </h1>
+
+        <!-- Pull Quote Highlight -->
+        <div id="drawerPullQuoteBox" style="background:linear-gradient(135deg, #0F5BC0, #0A3D82); color:#FFFFFF; border-left:5px solid var(--gold); border-radius:16px; padding:24px 28px; margin-bottom:34px; box-shadow:0 12px 30px rgba(15,91,192,0.18);">
+          <span style="font-family:var(--font-quote); font-size:36px; line-height:0.3; display:block; color:var(--gold); margin-bottom:10px;">“</span>
+          <p id="drawerPullQuoteText" style="font-family:var(--font-serif); font-size:18px; font-weight:600; line-height:1.7;">
+            எழுத்து என்பது அமைதியின் இன்னொரு குரல்.
+          </p>
+        </div>
+
+        <!-- QA Flow -->
+        <div id="drawerQAList">
+          <!-- Dynamic Q&A Cards generated via JS -->
+        </div>
+
+        <!-- Reader Footer -->
+        <div style="margin-top:40px; padding-top:24px; border-top:1px solid var(--border-light); text-align:center;">
+          <button class="btn-primary-gold" onclick="closeReader()" style="margin:0 auto;">
+            <span>வாசித்து முடிந்தது • முகப்பிற்குத் திரும்பு</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       7. MAGAZINE FOOTER
+  =========================================== -->
+  <footer class="magazine-footer" id="footer">
+    <div class="footer-inner">
       <div>
-        <h3>Join the Dialogue</h3>
-        <p>மாதாந்திர கட்டுரைகள், தனிச்சிறப்பு நேர்காணல்கள் உங்கள் இன்பாக்ஸில்.</p>
+        <div class="footer-brand-title">கூவல்</div>
+        <div class="footer-tagline">இலக்கிய மின்னிதழ் • Cloudflare Pages</div>
+        <p class="footer-desc">
+          தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை, இலக்கியம், சூழலியல் ஆளுமைகளின் வழி உணரும் மாதாந்திர இலக்கிய முன்னெடுப்பு.
+        </p>
       </div>
-      <a href="#" class="sp-join-btn">சேருங்கள்</a>
-    </div>
-  </div>
-</section>
 
-<section class="wall" id="quotes">
-  <span class="pill-soft">மேற்கோள் அரங்கம்</span>
-  <h2>சொற்களின் வெளி</h2>
-  <p class="sub">தமிழ்ப் படைப்பாளிகளின் சிந்தனைத் துளிகள்</p>
-  {withTint.length > 0 && (
-  <div class="pm-wall">
-    <div class="pm-particles">
-      {petals.map((s) => <span class="pm-petal" style={s}></span>)}
-    </div>
-    <div class="pm-row-depth pm-row-back">
-      <div class="pm-row pm-left">
-        {rowBack.map((q) => (
-            <a href="#" class={`pm-card tint-${q.tint}`}>
-              <span class="pm-cat-tag">{q.category}</span>
-              <span class="pm-mark">"</span>
-              <p class="pm-quote-ta">{q.quote}</p>
-              <div class="pm-attribution">
-                <div class="pm-avatar" style={q.photo ? `background-image:url('${q.photo}')` : undefined}></div>
-                <div>
-                  <div class="pm-name">{q.author}</div>
-                  {q.role && <div class="pm-role">{q.role}</div>}
-                </div>
-              </div>
-              <span class="pm-readmore">முழு நேர்காணலைப் படிக்க <span class="material-symbols-outlined">north_east</span></span>
-            </a>
-        ))}
+      <div>
+        <h4 class="footer-heading">பகுதிகள்</h4>
+        <ul class="footer-links-list">
+          <li><a href="#hero">முகப்பு</a></li>
+          <li><a href="#showcase">சிறப்புக் கட்டுரைகள்</a></li>
+          <li><a href="#quotes">மேற்கோள் அரங்கம்</a></li>
+          <li><a href="#newsletter">மின்மடல் சந்தா</a></li>
+        </ul>
       </div>
-    </div>
-    <div class="pm-row-depth pm-row-front">
-      <div class="pm-row pm-right">
-        {rowFront.map((q) => (
-            <a href="#" class={`pm-card tint-${q.tint}`}>
-              <span class="pm-cat-tag">{q.category}</span>
-              <span class="pm-mark">"</span>
-              <p class="pm-quote-ta">{q.quote}</p>
-              <div class="pm-attribution">
-                <div class="pm-avatar" style={q.photo ? `background-image:url('${q.photo}')` : undefined}></div>
-                <div>
-                  <div class="pm-name">{q.author}</div>
-                  {q.role && <div class="pm-role">{q.role}</div>}
-                </div>
-              </div>
-              <span class="pm-readmore">முழு நேர்காணலைப் படிக்க <span class="material-symbols-outlined">north_east</span></span>
-            </a>
-        ))}
+
+      <div>
+        <h4 class="footer-heading">மின்னிதழ் தகவல்</h4>
+        <ul class="footer-links-list">
+          <li><a href="#hero">கூவல் பற்றி</a></li>
+          <li><a href="#showcase">ஆசிரியர் குறிப்பு</a></li>
+          <li><a href="/admin/" style="color:var(--gold); font-weight:700;">நிர்வாக உள்நுழைவு (/admin/)</a></li>
+          <li><a href="https://github.com/DrMohanraj/Kooval" target="_blank" rel="noopener">GitHub களஞ்சியம் ↗</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4 class="footer-heading">குறிச்சொற்கள்</h4>
+        <div class="tag-cloud-wrap">
+          <span class="tag-pill-btn">இலக்கியம்</span>
+          <span class="tag-pill-btn">கவிதையியல்</span>
+          <span class="tag-pill-btn">சூழலியல்</span>
+          <span class="tag-pill-btn">வரலாறு</span>
+          <span class="tag-pill-btn">நாட்டார் வழக்காறு</span>
+          <span class="tag-pill-btn">விமர்சனம்</span>
+        </div>
       </div>
     </div>
-  </div>
-)}
-</section>
 
-<footer id="footer">
-  <div class="f-in">
-    <div>
-      <div class="f-logo">கூவல்</div>
-      <div class="f-tag">இலக்கிய மின்னிதழ்</div>
-      <p class="f-desc">தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை, இலக்கியம், சூழலியல் ஆளுமைகளின் வழி உணரும் மாதாந்திர இலக்கிய முன்னெடுப்பு.</p>
+    <div class="footer-bottom-bar">
+      <span>© 2026 கூவல் (Koovel) இலக்கிய மின்னிதழ் • அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.</span>
+      <div style="display:flex; gap:20px;">
+        <a href="#hero" style="color:var(--gold);">மேலே செல்ல ↑</a>
+      </div>
     </div>
-    <div>
-      <h4>பகுதிகள்</h4>
-      <ul><li><a href="#">அட்டைக் கட்டுரை</a></li><li><a href="#">இந்த இதழில்</a></li><li><a href="#">நேர்காணல்கள்</a></li><li><a href="#">பழைய இதழ்கள்</a></li><li><a href="#">தொகுப்புகள்</a></li></ul>
-    </div>
-    <div>
-      <h4>மின்னிதழ் தகவல்</h4>
-      <ul><li><a href="#">எங்களைப் பற்றி</a></li><li><a href="#">ஆசிரியர் குறிப்பு</a></li><li><a href="#">படைப்புகள் அனுப்பு</a></li><li><a href="/admin/">நிர்வாக உள்நுழைவு</a></li></ul>
-    </div>
-    <div>
-      <h4>முக்கியக் குறிச்சொற்கள்</h4>
-      <div class="tags"><a href="#">இலக்கியம்</a><a href="#">கவிதையியல்</a><a href="#">வரலாறு</a><a href="#">நாட்டார் வழக்காறு</a><a href="#">விமர்சனம்</a><a href="#">சமூக நினைவு</a></div>
-    </div>
-  </div>
-  <div class="f-bot">
-    <span>© 2026 கூவல் (Koovel) இலக்கிய மின்னிதழ். அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.</span>
-    <nav><a href="#">தனியுரிமைக் கொள்கை</a><a href="#">தொடர்புக்கு</a></nav>
-  </div>
-</footer>
+  </footer>
 
-<script is:inline>
-  // hero typewriter
-  (function(){var t=document.getElementById('typer');if(!t)return;var s=t.getAttribute('data-full'),i=0;
-    (function step(){t.textContent=s.slice(0,i++);if(i<=s.length)setTimeout(step,28);})();})();
-</script>
+  <!-- Serialized interviews for reading modal -->
+  <script is:inline type="application/json" id="interviews-json" set:html={serializedData}></script>
+
+  <!-- Client-side Interactive Logic -->
+  <script is:inline>
+    // 1. Hero Typewriter Animation with realistic cadence
+    (function initTypewriter() {
+      const el = document.getElementById('typer');
+      if (!el) return;
+      const text = el.getAttribute('data-full') || '';
+      let i = 0;
+      function step() {
+        if (i <= text.length) {
+          el.textContent = text.slice(0, i++);
+          const char = text[i - 1];
+          const delay = (char === '.' || char === '!' || char === '?') ? 350 : (char === ',' ? 180 : 32);
+          setTimeout(step, delay);
+        }
+      }
+      step();
+    })();
+
+    // 2. In-Place Interview Reader Data & Handlers
+    let currentInterviews = [];
+    try {
+      const raw = document.getElementById('interviews-json').textContent;
+      currentInterviews = JSON.parse(raw);
+    } catch (e) {
+      console.error(e);
+    }
+
+    let baseFontSize = 16.5;
+
+    function openReader(slug) {
+      const entry = currentInterviews.find((item) => item.slug === slug) || currentInterviews[0];
+      if (!entry) return;
+
+      document.getElementById('drawerCategoryPill').textContent = entry.category;
+      document.getElementById('drawerIssueText').textContent = 'இதழ் ' + (entry.issueNumber || '12') + ' • ' + entry.date;
+      document.getElementById('drawerCoverImg').src = entry.coverImage;
+      document.getElementById('drawerAuthorAvatar').src = entry.authorPhoto;
+      document.getElementById('drawerAuthorName').textContent = entry.authorName;
+      document.getElementById('drawerAuthorRole').textContent = entry.authorRole || 'எழுத்தாளர்';
+      document.getElementById('drawerTitle').textContent = entry.title;
+
+      // Pull Quote
+      const quoteBox = document.getElementById('drawerPullQuoteBox');
+      const quoteText = document.getElementById('drawerPullQuoteText');
+      if (entry.pullQuotes && entry.pullQuotes.length > 0) {
+        quoteText.textContent = entry.pullQuotes[0];
+        quoteBox.style.display = 'block';
+      } else {
+        quoteBox.style.display = 'none';
+      }
+
+      // QA Flow
+      const qaContainer = document.getElementById('drawerQAList');
+      qaContainer.innerHTML = '';
+      if (entry.qa && entry.qa.length > 0) {
+        entry.qa.forEach((item, idx) => {
+          const card = document.createElement('div');
+          card.className = 'qa-card-block';
+          card.innerHTML = `
+            <div class="qa-q-title">
+              <span class="qa-badge-q">${idx + 1}</span>
+              <span>${item.question}</span>
+            </div>
+            <p class="qa-a-text">${item.answer}</p>
+          `;
+          qaContainer.appendChild(card);
+        });
+      } else {
+        const fallback = document.createElement('div');
+        fallback.className = 'qa-card-block';
+        fallback.innerHTML = `<p class="qa-a-text">${entry.excerpt}</p>`;
+        qaContainer.appendChild(fallback);
+      }
+
+      const drawer = document.getElementById('readerDrawer');
+      drawer.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      document.getElementById('drawerScrollArea').scrollTop = 0;
+    }
+
+    function closeReader() {
+      const drawer = document.getElementById('readerDrawer');
+      drawer.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function closeReaderOnBackdrop(e) {
+      if (e.target.id === 'readerDrawer') {
+        closeReader();
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeReader();
+    });
+
+    function changeFontSize(delta) {
+      baseFontSize = Math.max(14, Math.min(24, baseFontSize + delta * 1.5));
+      const texts = document.querySelectorAll('.qa-a-text, #drawerPullQuoteText');
+      texts.forEach((t) => (t.style.fontSize = baseFontSize + 'px'));
+    }
+
+    // 3. Category Filter for Editorial Showcase
+    function filterShowcase(category) {
+      const buttons = document.querySelectorAll('.category-filter-btn');
+      buttons.forEach((b) => {
+        if (b.getAttribute('data-cat') === category) {
+          b.style.background = '#0F5BC0';
+          b.style.color = '#FFFFFF';
+          b.style.borderColor = '#0F5BC0';
+        } else {
+          b.style.background = '#FFFFFF';
+          b.style.color = '#17191E';
+          b.style.borderColor = 'rgba(23,25,30,0.12)';
+        }
+      });
+
+      const cards = document.querySelectorAll('.article-card');
+      cards.forEach((card) => {
+        const itemCat = card.getAttribute('data-category');
+        if (category === 'அனைத்தும்' || itemCat === category) {
+          card.style.display = '';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    // 4. Newsletter Subscribe Mock
+    function handleSubscribe(e) {
+      e.preventDefault();
+      const email = document.getElementById('subEmail').value;
+      const msg = document.getElementById('subMessage');
+      msg.textContent = 'நன்றி! ' + email + ' பதிவு செய்யப்பட்டது. அடுத்த இதழ் உங்கள் இன்பாக்ஸில் வரும்.';
+      document.getElementById('subscribeForm').reset();
+    }
+  </script>
 </body>
 </html>
