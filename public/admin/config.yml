@@ -1,8 +1,8 @@
 backend:
-  name: git-gateway
+  name: github
+  repo: DrMohanraj/Kooval
   branch: main
-
-# Netlify Identity + Git Gateway settings-ஐ Netlify dashboard-ல் "Enable" பண்ணிய பிறகு இது வேலை செய்யும்.
+  auth_endpoint: auth
 
 media_folder: "public/images/uploads"
 public_folder: "/images/uploads"

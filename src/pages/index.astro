@@ -1,131 +1,194 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import QuoteWall from '../components/QuoteWall.astro';
 import { getCollection } from 'astro:content';
+import '../styles/global.css';
 
-const all = (await getCollection('interviews')).sort((a, b) => b.data.date.valueOf() - a.data.date.valueOf());
-const picks = [...all.filter((e) => e.data.featured), ...all.filter((e) => !e.data.featured)].slice(0, 5);
-const fmt = (d: Date) => d.toLocaleDateString('ta-IN', { year: 'numeric', month: 'long' });
-const THEME: Record<string, number> = { yellow: 1, blue: 2, black: 3 };
+const all = (await getCollection('interviews')).sort(
+  (a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime()
+);
+const featured = all.find((i) => i.data.featured) ?? all[0];
 
-function slugify(name: string) {
-  return (name || '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u0B80-\u0BFF-]/g, '');
-}
+// ----- Hero (CMS-இல் "Homepage Hero-ல் காட்டவா?" தேர்ந்த நேர்காணல்) -----
+const heroTitle = featured?.data.title ?? 'சொற்களின் மௌனம் பேசும் ஆழ்ந்த வெளி';
+const words = heroTitle.split(' ');
+const hlCount = words.length > 3 ? 2 : 1;
+const titleMain = words.slice(0, words.length - hlCount).join(' ');
+const titleHl = words.slice(words.length - hlCount).join(' ');
+const heroLead = featured?.data.qa?.[0]?.answer ?? featured?.data.excerpt ?? '';
+const heroAuthor = featured?.data.authorName ?? 'எழுத்தாளர் பெயர்';
+const heroPhoto = featured?.data.coverImage || featured?.data.authorPhoto || '/images/hero-placeholder.jpg';
 
-const slides = picks.map((e) => ({
-  slug: e.slug,
-  name: e.data.authorName || e.data.author || 'எழுத்தாளர்',
-  role: e.data.authorRole || '',
-  date: fmt(e.data.date),
-  quote: (e.data.pullQuotes && e.data.pullQuotes[0]) || '',
-  desc: e.data.excerpt || '',
-  spines: [e.data.category || 'இலக்கியம்', ...(e.data.tags || []).slice(0, 3), fmt(e.data.date)].slice(0, 5),
-  img: e.data.coverImage || e.data.heroImage || e.data.authorPhoto || (e.data.photos && e.data.photos[0]) || 'https://images.unsplash.com/photo-1516575334481-f85287c2c82d?w=1200&h=675&fit=crop&q=80',
-  cut: Boolean(e.data.heroImage),
-  theme: THEME[e.data.heroTheme] || 1,
-}));
-const s0 = slides[0];
-const json = JSON.stringify(slides).replace(/</g, '\\u003c');
-const recentInterviews = all.slice(0, 6);
+// ----- மேற்கோள்கள்: எல்லா நேர்காணல்களின் pullQuotes -----
+const tints = ['blue', 'sage', 'gold', 'plum', 'olive'];
+const quotes = all.flatMap((i) =>
+  (i.data.pullQuotes ?? []).filter(Boolean).map((q) => ({
+    quote: q,
+    author: i.data.authorName,
+    role: i.data.authorRole ?? '',
+    photo: i.data.authorPhoto ?? '',
+    category: i.data.category,
+    featured: i.id === featured?.id,
+  }))
+);
+const heroQuotes = (featured?.data.pullQuotes ?? []).filter(Boolean).slice(0, 2);
+const orbQuotes = heroQuotes.length ? heroQuotes : quotes.slice(0, 2).map((q) => q.quote);
+
+const withTint = quotes.map((q, i) => ({ ...q, tint: tints[i % tints.length] }));
+const back = withTint.filter((_, i) => i % 2 === 0);
+const front = withTint.filter((_, i) => i % 2 === 1);
+// தடையற்ற சுழற்சிக்கு: குறைந்தது 6 card வரை நிரப்பி, பின் இரட்டிப்பாக்கு
+const fill = (arr) => {
+  if (!arr.length) return [];
+  let out = [...arr];
+  while (out.length < 6) out = out.concat(arr);
+  return out.concat(out);
+};
+const rowBack = fill(back);
+const rowFront = fill(front.length ? front : back.slice().reverse());
+
+const petals = Array.from({ length: 10 }, (_, i) =>
+  `left:${3 + i * 9.5}%; animation-duration:${14 + (i % 4) * 3}s; animation-delay:-${(i * 2.2).toFixed(1)}s;`
+);
 ---
-<BaseLayout>
-  {s0 ? (
-    <section class:list={['hero', { photo: !s0.cut }]} data-s={s0.theme} id="top">
-      <div class="hl" id="hl">
-        <span class="kk">இந்த இதழ்</span>
-        <h2 class="t">இந்த இதழின் எழுத்தாளர்</h2>
-        <h1 class="nm" id="nm1"><span>{s0.name}</span></h1>
-        <div class="rl" id="rl">{s0.role}{s0.role ? ' · ' : ''}{s0.date}</div>
-        <p class="qt" id="qt">{s0.quote ? `“ ${s0.quote} ”` : ''}</p>
-        <p class="ds" id="ds">{s0.desc}</p>
-        <a class="bt" id="bt" href={`/interview/${s0.slug}`}>நேர்காணலைப் படிக்க <svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
-      </div>
-      <div class="art">
-        <div class="dsc" id="dsc"><div class="ph"><img id="phi" src={s0.img} alt={s0.name} /></div></div>
-        <div class="ht"></div>
-        <div class="hw" id="hw">{slides.map((s) => s.quote).filter(Boolean).join(' ')}</div>
-        <Fragment set:html={`<svg class="sk" viewBox="0 0 1000 280" preserveAspectRatio="xMidYMax slice"><defs><pattern id="wn" width="16" height="22" patternUnits="userSpaceOnUse"><rect x="4" y="5" width="7" height="10" style="fill:var(--win)"/></pattern></defs>
-<g fill="currentColor"><path id="bl" d="M0 280V170h70v-34h54v48h46v-70h76v90h54v-44h66v74h44v-96h84v116h62v-54h74v64h54v-130h96v150h62v-86h66v96h92V280z"/><rect x="0" y="262" width="1000" height="18"/></g><use href="#bl" fill="url(#wn)" opacity=".85"/>
-<g fill="currentColor"><circle cx="150" cy="128" r="40"/><circle cx="185" cy="140" r="30"/><circle cx="120" cy="150" r="28"/><rect x="146" y="150" width="8" height="120"/><circle cx="820" cy="120" r="46"/><circle cx="860" cy="138" r="32"/><circle cx="785" cy="140" r="30"/><rect x="816" y="150" width="9" height="120"/></g>
-<g stroke="currentColor" stroke-width="7" fill="none" stroke-linecap="round"><path d="M560 270Q568 190 555 120"/><path d="M555 120q-40-6-62 22M555 120q36-14 66 8M555 120q-16-34-46-40M555 120q18-38 52-34M555 120q-4-30 4-52"/></g>
-<g stroke="currentColor" stroke-width="5" fill="none"><path d="M690 272V90"/></g><g fill="currentColor"><path d="M676 86h28l-5-28h-18z"/></g><circle cx="690" cy="72" r="7" style="fill:var(--win)"/><g stroke="currentColor" stroke-width="3" fill="none"><path d="M690 56V44"/><path d="M60 40q8-10 16 0q8-10 16 0M110 70q7-9 14 0q7-9 14 0M300 30q8-10 16 0q8-10 16 0M930 60q7-9 14 0q7-9 14 0"/></g></svg>`} />
-        <div class="pt" id="pt"><img id="pti" src={s0.img} alt={s0.name} /></div>
-        <div class="bks" id="bks">{s0.spines.map((t) => <b>{t}</b>)}</div>
-        <div class="ctl" id="ctl" hidden={slides.length < 2}>
-          <span class="c"><b id="cn">01</b> / <span id="ct">{String(slides.length).padStart(2, '0')}</span></span>
-          <button id="pv" aria-label="முந்தையது"><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
-          <button id="nx" aria-label="அடுத்தது"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-        </div>
-      </div>
-      <script is:inline type="application/json" id="slides" set:html={json}></script>
-    </section>
-  ) : (
-    <section class="hero" data-s="1" style="min-height:360px">
-      <div class="hl"><h2 class="t">இன்னும் நேர்காணல்கள் இல்லை</h2><p class="ds">/admin வழியாக முதல் நேர்காணலைச் சேர்க்கவும்.</p></div>
-    </section>
-  )}
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>கூவல் - இலக்கிய மின்னிதழ்</title>
+<meta name="description" content="தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை, இலக்கியம், சூழலியல் ஆளுமைகளின் வழி உணரும் மாதாந்திர இலக்கிய மின்னிதழ்.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Tamil:wght@400;600;700;800&family=Catamaran:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&family=Bodoni+Moda:wght@500;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+</head>
+<body>
 
-  <!-- Featured Editorial Section -->
-  <section class="px-margin-desktop py-section-gap">
-    <div class="max-w-6xl mx-auto">
-      <div class="flex flex-col md:flex-row md:items-end justify-between mb-stack-lg gap-4 reveal">
-        <div>
-          <span class="font-label-caps text-label-caps text-secondary font-bold tracking-widest block mb-2">CURATED VOICES</span>
-          <h2 class="font-display-lg text-3xl md:text-5xl text-primary font-bold">சமீபத்திய நேர்காணல்கள்</h2>
-        </div>
-        <a href="/archive" class="inline-flex items-center gap-2 font-label-caps text-sm text-primary font-semibold hover:text-secondary transition-colors group">
-          அனைத்து நேர்காணல்களும் (காப்பகம்)
-          <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
-      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {recentInterviews.map((entry) => {
-          const author = entry.data.authorName || entry.data.author || 'எழுத்தாளர்';
-          const cover = entry.data.coverImage || entry.data.heroImage || entry.data.authorPhoto || (entry.data.photos && entry.data.photos[0]) || 'https://images.unsplash.com/photo-1516575334481-f85287c2c82d?w=1200&h=675&fit=crop&q=80';
-          return (
-            <article class="reveal magazine-lift bg-white rounded-2xl overflow-hidden border border-neutral-200/80 shadow-sm hover:shadow-xl transition-all flex flex-col justify-between">
-              <div>
-                <a href={`/interview/${entry.slug}`} class="block aspect-[16/10] overflow-hidden relative group">
-                  <span class="absolute top-3 left-3 z-10 bg-primary/90 text-white font-label-caps text-xs px-3 py-1 rounded-full shadow-sm">
-                    {entry.data.category || 'இலக்கியம்'}
-                  </span>
-                  <img src={cover} alt={author} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-                </a>
+<!-- ======================================================
+  கூவல் (Koovel) — முகப்புப் பக்கம் மட்டும்
+  Placeholder: எழுத்தாளர் பெயர்கள், படங்கள், மேற்கோள்கள் எல்லாம் மாதிரி content.
+  மற்ற பக்கங்கள் நீக்கப்பட்டதால், மெனு/பொத்தான் இணைப்புகள் இப்போது "#"-ஐக் குறிக்கின்றன.
+====================================================== -->
 
-                <div class="p-6">
-                  <div class="flex items-center gap-2 text-xs text-neutral-500 mb-2 font-caption">
-                    <span>{entry.data.date.toLocaleDateString('ta-IN', { year: 'numeric', month: 'long' })}</span>
-                    {entry.data.issueNumber && <span>• இதழ் {entry.data.issueNumber}</span>}
-                  </div>
-                  <a href={`/interview/${entry.slug}`} class="block group">
-                    <h3 class="font-headline-md text-xl font-bold text-neutral-900 group-hover:text-primary transition-colors leading-snug mb-3">
-                      {entry.data.title}
-                    </h3>
-                  </a>
-                  <p class="font-body-md text-sm text-neutral-600 line-clamp-3 mb-4 leading-relaxed">
-                    {entry.data.excerpt}
-                  </p>
-                </div>
-              </div>
+<header class="topbar">
+  <a href="#" class="logo">கூவல்</a>
+  <nav class="topnav label">
+    <a href="#quotes">மேற்கோள் அரங்கம்</a>
+    <a href="#footer">தொடர்புக்கு</a>
+  </nav>
+</header>
 
-              <div class="px-6 pb-6 pt-2 border-t border-neutral-100 flex items-center justify-between">
-                <a href={`/author/${slugify(author)}`} class="flex items-center gap-2.5 group">
-                  {entry.data.authorPhoto && (
-                    <img src={entry.data.authorPhoto} alt={author} class="w-7 h-7 rounded-full object-cover border border-neutral-200" />
-                  )}
-                  <span class="text-xs font-semibold text-neutral-800 group-hover:text-primary transition-colors">{author}</span>
-                </a>
-                <a href={`/interview/${entry.slug}`} class="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-                  வாசிக்க <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                </a>
-              </div>
-            </article>
-          );
-        })}
+<section class="sp">
+  <div class="sp-left">
+    <div class="sp-left-in">
+      <span class="sp-label"><i class="bar"></i>நேர்காணல்</span>
+      <h1 class="sp-title">{titleMain} <span class="hl">{titleHl}</span></h1>
+      <p class="sp-lead" id="typer" data-full={heroLead}></p>
+      <div class="sp-cta">
+        <a href="#" class="sp-btn">தொடர்ந்து படிக்க <span class="material-symbols-outlined">arrow_outward</span></a>
+        <span class="sp-author">{heroAuthor}</span>
       </div>
     </div>
-  </section>
+  </div>
+  <a href="#" class="sp-portrait" aria-label="சிறப்பு நேர்காணல்">
+    <img src={heroPhoto} alt={heroAuthor} onerror="this.src='/images/hero-placeholder.jpg'" />
+  </a>
+  <div class="sp-right">
+    <div class="sp-orbs">
+      {orbQuotes.map((q, i) => (
+        <div class={`orb o${i + 1}`}><blockquote>"{q}"</blockquote></div>
+      ))}
+    </div>
+    <div class="sp-join">
+      <div>
+        <h3>Join the Dialogue</h3>
+        <p>மாதாந்திர கட்டுரைகள், தனிச்சிறப்பு நேர்காணல்கள் உங்கள் இன்பாக்ஸில்.</p>
+      </div>
+      <a href="#" class="sp-join-btn">சேருங்கள்</a>
+    </div>
+  </div>
+</section>
 
-  <QuoteWall />
-</BaseLayout>
+<section class="wall" id="quotes">
+  <span class="pill-soft">மேற்கோள் அரங்கம்</span>
+  <h2>சொற்களின் வெளி</h2>
+  <p class="sub">தமிழ்ப் படைப்பாளிகளின் சிந்தனைத் துளிகள்</p>
+  {withTint.length > 0 && (
+  <div class="pm-wall">
+    <div class="pm-particles">
+      {petals.map((s) => <span class="pm-petal" style={s}></span>)}
+    </div>
+    <div class="pm-row-depth pm-row-back">
+      <div class="pm-row pm-left">
+        {rowBack.map((q) => (
+            <a href="#" class={`pm-card tint-${q.tint}`}>
+              <span class="pm-cat-tag">{q.category}</span>
+              <span class="pm-mark">"</span>
+              <p class="pm-quote-ta">{q.quote}</p>
+              <div class="pm-attribution">
+                <div class="pm-avatar" style={q.photo ? `background-image:url('${q.photo}')` : undefined}></div>
+                <div>
+                  <div class="pm-name">{q.author}</div>
+                  {q.role && <div class="pm-role">{q.role}</div>}
+                </div>
+              </div>
+              <span class="pm-readmore">முழு நேர்காணலைப் படிக்க <span class="material-symbols-outlined">north_east</span></span>
+            </a>
+        ))}
+      </div>
+    </div>
+    <div class="pm-row-depth pm-row-front">
+      <div class="pm-row pm-right">
+        {rowFront.map((q) => (
+            <a href="#" class={`pm-card tint-${q.tint}`}>
+              <span class="pm-cat-tag">{q.category}</span>
+              <span class="pm-mark">"</span>
+              <p class="pm-quote-ta">{q.quote}</p>
+              <div class="pm-attribution">
+                <div class="pm-avatar" style={q.photo ? `background-image:url('${q.photo}')` : undefined}></div>
+                <div>
+                  <div class="pm-name">{q.author}</div>
+                  {q.role && <div class="pm-role">{q.role}</div>}
+                </div>
+              </div>
+              <span class="pm-readmore">முழு நேர்காணலைப் படிக்க <span class="material-symbols-outlined">north_east</span></span>
+            </a>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
+</section>
+
+<footer id="footer">
+  <div class="f-in">
+    <div>
+      <div class="f-logo">கூவல்</div>
+      <div class="f-tag">இலக்கிய மின்னிதழ்</div>
+      <p class="f-desc">தமிழ்ச் சமூகத்தின் பன்மைத்துவத்தை கலை, இலக்கியம், சூழலியல் ஆளுமைகளின் வழி உணரும் மாதாந்திர இலக்கிய முன்னெடுப்பு.</p>
+    </div>
+    <div>
+      <h4>பகுதிகள்</h4>
+      <ul><li><a href="#">அட்டைக் கட்டுரை</a></li><li><a href="#">இந்த இதழில்</a></li><li><a href="#">நேர்காணல்கள்</a></li><li><a href="#">பழைய இதழ்கள்</a></li><li><a href="#">தொகுப்புகள்</a></li></ul>
+    </div>
+    <div>
+      <h4>மின்னிதழ் தகவல்</h4>
+      <ul><li><a href="#">எங்களைப் பற்றி</a></li><li><a href="#">ஆசிரியர் குறிப்பு</a></li><li><a href="#">படைப்புகள் அனுப்பு</a></li><li><a href="/admin/">நிர்வாக உள்நுழைவு</a></li></ul>
+    </div>
+    <div>
+      <h4>முக்கியக் குறிச்சொற்கள்</h4>
+      <div class="tags"><a href="#">இலக்கியம்</a><a href="#">கவிதையியல்</a><a href="#">வரலாறு</a><a href="#">நாட்டார் வழக்காறு</a><a href="#">விமர்சனம்</a><a href="#">சமூக நினைவு</a></div>
+    </div>
+  </div>
+  <div class="f-bot">
+    <span>© 2026 கூவல் (Koovel) இலக்கிய மின்னிதழ். அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.</span>
+    <nav><a href="#">தனியுரிமைக் கொள்கை</a><a href="#">தொடர்புக்கு</a></nav>
+  </div>
+</footer>
+
+<script is:inline>
+  // hero typewriter
+  (function(){var t=document.getElementById('typer');if(!t)return;var s=t.getAttribute('data-full'),i=0;
+    (function step(){t.textContent=s.slice(0,i++);if(i<=s.length)setTimeout(step,28);})();})();
+</script>
+</body>
+</html>

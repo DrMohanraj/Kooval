@@ -1,2 +1,1 @@
-# Cloudflare Pages Redirects
 /admin/*  /admin/index.html  200
